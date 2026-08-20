@@ -35,6 +35,9 @@ button:hover{border-color:#8a6a3a}
 input[type=search]{background:#1d160f;color:inherit;border:1px solid #3a2c1e;
   padding:3px 7px;font:inherit;width:170px}
 .note{opacity:.55;max-width:74ch;margin:6px 0 0}
+#bar{display:flex;gap:9px;align-items:center;margin-top:8px;flex-wrap:wrap}
+#bar input[type=range]{flex:1;min-width:160px;accent-color:#8a6a3a}
+#clock{opacity:.7;min-width:52px;text-align:right}
 </style>
 <div id="top">
   <h1>CLOUDPAINTER — KNOBS</h1>
@@ -51,9 +54,20 @@ input[type=search]{background:#1d160f;color:inherit;border:1px solid #3a2c1e;
 <div id="wrap">
   <div id="stage">
     <iframe id="pv" src="lulz-15s.html"></iframe>
-    <p class="note">The 15-second cut. Press <b>d</b> in the frame for an fps and
-      phase readout, <b>space</b> to pause, arrows to scrub. If the frame is
-      blank, this page needs <code>lulz-15s.html</code> beside it.</p>
+    <div id="bar">
+      <button onclick="replay()">▶ play from the start</button>
+      <button onclick="toggle()" id="pp">pause</button>
+      <input type="range" id="scrub" min="0" max="1000" value="0"
+             oninput="scrubTo(this.value/1000)">
+      <span id="clock">0.0s</span>
+      <label style="opacity:.7"><input type="checkbox" id="loop" checked> repeat</label>
+    </div>
+    <p class="note">THE PIECE PLAYS ONCE AND STOPS — it is a progression, not a
+      loop, so it runs for fifteen seconds and holds on the finished painting.
+      Leave <b>repeat</b> on and it starts again, which is what you want while
+      tuning. Drag the bar to go to any moment. Press <b>d</b> inside the frame
+      for an fps readout. If the frame is blank, this page needs
+      <code>lulz-15s.html</code> beside it.</p>
   </div>
   <div id="side"></div>
 </div>
@@ -152,6 +166,44 @@ function filter() {
   }
   if (head) head.style.display = shown ? '' : 'none';
 }
+
+
+// ---- transport ----------------------------------------------------------
+// The piece is a PROGRESSION: it plays once and holds. Left alone in a tuning
+// page that means you look up from the sliders at a still frame and wonder
+// whether anything is working. So: a replay, a scrubber, and a repeat that is
+// on by default, which is the one thing a bench actually needs.
+function W() { const w = pv.contentWindow; return (w && w.CP) ? w : null; }
+
+function replay() {
+  const w = W(); if (!w) return;
+  w.CP.seek(0); w.CP.play();
+  document.getElementById('pp').textContent = 'pause';
+}
+
+function toggle() {
+  const w = W(); if (!w) return;
+  const b = document.getElementById('pp');
+  if (b.textContent === 'pause') { w.CP.pause(); b.textContent = 'play'; }
+  else { w.CP.play(); b.textContent = 'pause'; }
+}
+
+function scrubTo(p) {
+  const w = W(); if (!w) return;
+  w.CP.seek(p);
+  document.getElementById('pp').textContent = 'play';
+}
+
+setInterval(() => {
+  const w = W(); if (!w) return;
+  const p = w.CP.phase(), dur = w.SCENE.dur;
+  document.getElementById('scrub').value = Math.round(p * 1000);
+  document.getElementById('clock').textContent = (p * dur).toFixed(1) + 's';
+  if (p >= 0.999 && document.getElementById('loop').checked
+      && document.getElementById('pp').textContent === 'pause') replay();
+}, 120);
+
+pv.addEventListener('load', () => setTimeout(replay, 300));
 
 function shuffle() {
   for (const k of KNOBS) {
