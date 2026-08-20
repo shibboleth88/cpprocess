@@ -23,6 +23,12 @@ The live piece the paintings borrow their motion from — a system perceiving a 
 - [Internal health](https://shibboleth88.github.io/cpprocess/internal-health.html) — the engine's own readouts
 - [External stimuli](https://shibboleth88.github.io/cpprocess/external-stimuli.html) — what the engine is being fed
 
+## Tools
+
+For adjusting the piece. Every knob the builder has, with what each one does — seven of them move the preview as you drag, the rest write a command line to hand back.
+
+- [Knobs](https://shibboleth88.github.io/cpprocess/tuner.html) — the tuning bench, as one page · no install
+
 ## This is a mirror, not the project
 
 The work lives in a private repository — the builder, the artist's
