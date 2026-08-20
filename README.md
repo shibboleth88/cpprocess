@@ -10,6 +10,7 @@ so GitHub Pages has something public to serve.
 The artist's plotted paintings, moving the way the perception engine's visuals move. Each is one self-contained file: a progression that starts on bare copper and ends on the finished physical painting.
 
 - [lulz — 30 seconds](https://shibboleth88.github.io/cpprocess/lulz.html) — the full progression · press d for a readout, space to pause, arrows to scrub
+- [lulz — 22 seconds](https://shibboleth88.github.io/cpprocess/lulz-22s.html) — the same piece, a little tighter
 - [lulz — 11 seconds](https://shibboleth88.github.io/cpprocess/lulz-11s.html) — the same piece, compressed
 
 ## The perception engine
