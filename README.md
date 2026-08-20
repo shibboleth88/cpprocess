@@ -11,6 +11,7 @@ The artist's plotted paintings, moving the way the perception engine's visuals m
 
 - [lulz — 30 seconds](https://shibboleth88.github.io/cpprocess/lulz.html) — the full progression · press d for a readout, space to pause, arrows to scrub
 - [lulz — 22 seconds](https://shibboleth88.github.io/cpprocess/lulz-22s.html) — the same piece, a little tighter
+- [lulz — 15 seconds](https://shibboleth88.github.io/cpprocess/lulz-15s.html) — the same piece, tighter still
 - [lulz — 11 seconds](https://shibboleth88.github.io/cpprocess/lulz-11s.html) — the same piece, compressed
 
 ## The perception engine
