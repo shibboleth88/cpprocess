@@ -3,7 +3,7 @@
 The published pieces, and nothing else. This repository exists **only** so that
 GitHub Pages can serve them:
 
-- **https://shibboleth88.github.io/cloudpainter-pieces/**
+- **https://shibboleth88.github.io/cpprocess/**
 
 Two files and a landing page. Each piece is one self-contained HTML file —
 canvas renderer, no dependencies, no external references, every image inlined.
