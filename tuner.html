@@ -38,6 +38,14 @@ input[type=search]{background:#1d160f;color:inherit;border:1px solid #3a2c1e;
 #bar{display:flex;gap:9px;align-items:center;margin-top:8px;flex-wrap:wrap}
 #bar input[type=range]{flex:1;min-width:160px;accent-color:#8a6a3a}
 #clock{opacity:.7;min-width:52px;text-align:right}
+#saved{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+#saved .v{border:1px solid #3a2c1e;background:#100c08;padding:2px 4px 2px 8px;
+  display:flex;gap:6px;align-items:center}
+#saved .v b{font-weight:600;color:#e0cba6;cursor:pointer}
+#saved .v b:hover{color:#f0dcb4;text-decoration:underline}
+#saved .v i{opacity:.45;font-style:normal;cursor:pointer;padding:0 3px}
+#saved .v i:hover{color:#d98a6a;opacity:1}
+#saved .none{opacity:.4}
 </style>
 <div id="top">
   <h1>CLOUDPAINTER — KNOBS</h1>
@@ -48,6 +56,8 @@ input[type=search]{background:#1d160f;color:inherit;border:1px solid #3a2c1e;
   <button onclick="shuffle()">shuffle</button>
   <button onclick="reset()">reset</button>
   <button onclick="copyCmd()">copy command</button>
+  <button onclick="save()">save this one</button>
+  <button onclick="copyLink()">copy link</button>
   <input type="search" id="find" placeholder="filter knobs and text" oninput="filter()">
   <textarea id="cmd" readonly onclick="this.select()"></textarea>
 </div>
@@ -225,10 +235,120 @@ function shuffle() {
   for (const d in LIVE) apply(d);
 }
 
+
+// ---- keeping the ones you like ------------------------------------------
+// Two different needs, and they want different answers.
+//
+// SAVE puts a variation in this browser under a name, so a shortlist survives
+// shuffling past something good — which is the failure this page had: every
+// shuffle destroyed the previous one and there was no way back.
+//
+// LINK puts the whole setting into the URL. That is the one to send: the
+// piece is deterministic, so the settings ARE the variation, and a link
+// carries them exactly. Only what differs from the defaults goes in, so the
+// URL stays short and legible rather than a wall of base64.
+const KEY = 'cp-variations';
+
+function diffs() {
+  const o = {};
+  for (const k of KNOBS) {
+    if (k.kind === 'group') continue;
+    const v = V[k.dest];
+    if (v === undefined || v === null) continue;
+    if (k.unset && !TOUCHED.has(k.dest)) continue;
+    if (!k.unset && v === BASE[k.dest]) continue;
+    o[k.dest] = v;
+  }
+  return o;
+}
+
+function linkFor(o) {
+  const q = Object.entries(o)
+    .map(([a, b]) => a + '=' + (b === true ? 1 : b === false ? 0 : b));
+  return location.origin + location.pathname + '#' + q.join('&');
+}
+
+function copyLink() {
+  const t = document.createElement('textarea');
+  t.value = linkFor(diffs());
+  document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
+  flash('link copied — send it, or keep it as a bookmark');
+}
+
+function flash(m) {
+  const el = document.getElementById('saved');
+  const n = document.createElement('span');
+  n.className = 'none'; n.textContent = m; el.prepend(n);
+  setTimeout(() => n.remove(), 2600);
+}
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
+                  catch (e) { return {}; } }
+function store(o) { localStorage.setItem(KEY, JSON.stringify(o)); }
+
+function save() {
+  const seed = V.seed || 0;
+  const name = prompt('name this one', 'seed ' + seed);
+  if (!name) return;
+  const all = load(); all[name] = diffs(); store(all); shelf();
+}
+
+function recall(name) {
+  const o = load()[name]; if (!o) return;
+  V = JSON.parse(JSON.stringify(START));
+  TOUCHED.clear();
+  for (const [k, v] of Object.entries(o)) { V[k] = v; TOUCHED.add(k); }
+  draw();
+  for (const d in LIVE) apply(d);
+  flash('loaded "' + name + '" — copy the command to build it');
+}
+
+function drop(name) {
+  const all = load(); delete all[name]; store(all); shelf();
+}
+
+function shelf() {
+  const el = document.getElementById('saved');
+  const all = load(), names = Object.keys(all);
+  el.innerHTML = '';
+  if (!names.length) {
+    el.innerHTML = '<span class="none">no saved variations yet — '
+      + 'shuffle, then <b>save this one</b></span>';
+    return;
+  }
+  for (const n of names) {
+    const d = document.createElement('span');
+    d.className = 'v';
+    d.innerHTML = '<b></b><i title="forget">x</i>';
+    d.querySelector('b').textContent = n;
+    d.querySelector('b').onclick = () => recall(n);
+    d.querySelector('i').onclick = () => drop(n);
+    el.append(d);
+  }
+}
+
+function fromHash() {
+  const h = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!h) return false;
+  const by = {};
+  for (const k of KNOBS) if (k.kind !== 'group') by[k.dest] = k;
+  for (const pair of h.split('&')) {
+    const [a, b] = pair.split('=');
+    const k = by[a]; if (!k) continue;
+    V[a] = k.kind === 'bool' ? (b === '1' || b === 'true') : +b;
+    TOUCHED.add(a);
+  }
+  return true;
+}
+
 function reset() {
-  V = JSON.parse(JSON.stringify(START)); TOUCHED.clear(); draw();
+  V = JSON.parse(JSON.stringify(START)); TOUCHED.clear();
+  history.replaceState(null, '', location.pathname);
+  draw(); shelf();
   pv.src = 'lulz-15s.html?' + Date.now();
 }
 
+fromHash();
 draw();
+shelf();
 </script>
