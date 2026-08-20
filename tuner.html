@@ -46,6 +46,11 @@ input[type=search]{background:#1d160f;color:inherit;border:1px solid #3a2c1e;
 #saved .v i{opacity:.45;font-style:normal;cursor:pointer;padding:0 3px}
 #saved .v i:hover{color:#d98a6a;opacity:1}
 #saved .none{opacity:.4}
+#stale{margin-top:7px;padding:7px 10px;border:1px solid #3f5c46;
+  background:#0e1510;color:#9ccfae;display:none;line-height:1.6}
+#stale.on{display:block}
+#stale b{color:#f0c99a}
+#stale .ok{color:#7fbf9a}
 </style>
 <div id="top">
   <h1>CLOUDPAINTER — KNOBS</h1>
@@ -59,6 +64,7 @@ input[type=search]{background:#1d160f;color:inherit;border:1px solid #3a2c1e;
   <button onclick="save()">save this one</button>
   <button onclick="copyLink()">copy link</button>
   <input type="search" id="find" placeholder="filter knobs and text" oninput="filter()">
+  <div id="stale"></div>
   <textarea id="cmd" readonly onclick="this.select()"></textarea>
   <div id="saved"></div>
 </div>
@@ -122,6 +128,8 @@ function cmd() {
   }
   a.push('--out animations/lulz-15s.html');
   document.getElementById('cmd').value = a.join(' \\\n    ');
+  staleness();
+  if (typeof staleness === 'function') staleness();
 }
 
 function copyCmd() {
@@ -216,130 +224,67 @@ setInterval(() => {
 
 pv.addEventListener('load', () => setTimeout(replay, 300));
 
-function shuffle() {
-  for (const k of KNOBS) {
-    if (k.kind === 'group' || !k.shuf) continue;
-    if (k.dest === 'seed') { V.seed = Math.floor(Math.random() * 9999) + 1;
-                             TOUCHED.add('seed'); continue; }
-    if (k.kind === 'bool') {
-      if (Math.random() < 0.25) { V[k.dest] = !V[k.dest]; TOUCHED.add(k.dest); }
-      continue;
+// ---- shuffle: a genuinely different arrangement --------------------------
+// The seed changes every track in the piece and none of its images, so a set
+// of prebuilt arrangements can be swapped into the running player — a tenth
+// of a megabyte each once gzipped — and you see a real build rather than a
+// note telling you to go and run one.
+//
+// Shuffle therefore moves only what it can actually SHOW: the arrangement,
+// and the handful of render-time knobs a finished file still reads. Anything
+// else would put the preview and the command out of step, which is the one
+// thing a tuning page must not do.
+let SEEDS = [], seedAt = -1;
+
+fetch('seeds/index.json').then(r => r.json()).then(a => { SEEDS = a; note(); })
+  .catch(() => note());
+
+function note() {
+  const el = document.getElementById('stale');
+  if (!SEEDS.length) {
+    el.className = 'on';
+    el.innerHTML = 'No prebuilt arrangements found beside this page, so ' +
+      '<b>shuffle</b> can only move the live settings. Copy the command to ' +
+      'build anything else.';
+  } else { el.className = ''; el.innerHTML = ''; }
+}
+
+async function shuffle() {
+  // a different arrangement, actually loaded
+  if (SEEDS.length) {
+    let k = Math.floor(Math.random() * SEEDS.length);
+    if (SEEDS.length > 1 && k === seedAt) k = (k + 1) % SEEDS.length;
+    seedAt = k;
+    const seed = SEEDS[k];
+    const el = document.getElementById('stale');
+    el.className = 'on'; el.textContent = 'loading arrangement ' + seed + '…';
+    const t0 = performance.now();
+    try {
+      const sc = await (await fetch('seeds/' + seed + '.json')).json();
+      const w = W();
+      if (w && w.CP.setScene) {
+        w.CP.setScene(sc);
+        V.seed = seed; TOUCHED.add('seed');
+        el.className = 'on';
+        el.innerHTML = '<b>arrangement ' + seed + '</b> — loaded in ' +
+          ((performance.now() - t0) / 1000).toFixed(1) + 's, and playing. ' +
+          'This is a real build; the command below makes the same file.';
+      }
+    } catch (e) {
+      el.className = 'on'; el.textContent = 'could not load that arrangement: ' + e;
     }
+  }
+  // and the render-time knobs, which the preview can honour as they move
+  for (const k of KNOBS) {
+    if (k.kind === 'group' || !k.live || !k.shuf) continue;
     const cur = +V[k.dest];
     const span = (cur || (k.hi - k.lo) * 0.25) * SPREAD;
-    let v = cur + (Math.random() * 2 - 1) * span;
-    v = Math.max(k.lo, Math.min(k.hi, v));
+    let v = Math.max(k.lo, Math.min(k.hi, cur + (Math.random() * 2 - 1) * span));
     v = k.kind === 'int' ? Math.round(v) : Math.round(v / k.step) * k.step;
     V[k.dest] = +v.toFixed(4); TOUCHED.add(k.dest);
   }
   draw();
   for (const d in LIVE) apply(d);
-}
-
-
-// ---- keeping the ones you like ------------------------------------------
-// Two different needs, and they want different answers.
-//
-// SAVE puts a variation in this browser under a name, so a shortlist survives
-// shuffling past something good — which is the failure this page had: every
-// shuffle destroyed the previous one and there was no way back.
-//
-// LINK puts the whole setting into the URL. That is the one to send: the
-// piece is deterministic, so the settings ARE the variation, and a link
-// carries them exactly. Only what differs from the defaults goes in, so the
-// URL stays short and legible rather than a wall of base64.
-const KEY = 'cp-variations';
-
-function diffs() {
-  const o = {};
-  for (const k of KNOBS) {
-    if (k.kind === 'group') continue;
-    const v = V[k.dest];
-    if (v === undefined || v === null) continue;
-    if (k.unset && !TOUCHED.has(k.dest)) continue;
-    if (!k.unset && v === BASE[k.dest]) continue;
-    o[k.dest] = v;
-  }
-  return o;
-}
-
-function linkFor(o) {
-  const q = Object.entries(o)
-    .map(([a, b]) => a + '=' + (b === true ? 1 : b === false ? 0 : b));
-  return location.origin + location.pathname + '#' + q.join('&');
-}
-
-function copyLink() {
-  const t = document.createElement('textarea');
-  t.value = linkFor(diffs());
-  document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
-  flash('link copied — send it, or keep it as a bookmark');
-}
-
-function flash(m) {
-  const el = document.getElementById('saved');
-  const n = document.createElement('span');
-  n.className = 'none'; n.textContent = m; el.prepend(n);
-  setTimeout(() => n.remove(), 2600);
-}
-
-function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; }
-                  catch (e) { return {}; } }
-function store(o) { localStorage.setItem(KEY, JSON.stringify(o)); }
-
-function save() {
-  const seed = V.seed || 0;
-  const name = prompt('name this one', 'seed ' + seed);
-  if (!name) return;
-  const all = load(); all[name] = diffs(); store(all); shelf();
-}
-
-function recall(name) {
-  const o = load()[name]; if (!o) return;
-  V = JSON.parse(JSON.stringify(START));
-  TOUCHED.clear();
-  for (const [k, v] of Object.entries(o)) { V[k] = v; TOUCHED.add(k); }
-  draw();
-  for (const d in LIVE) apply(d);
-  flash('loaded "' + name + '" — copy the command to build it');
-}
-
-function drop(name) {
-  const all = load(); delete all[name]; store(all); shelf();
-}
-
-function shelf() {
-  const el = document.getElementById('saved');
-  const all = load(), names = Object.keys(all);
-  el.innerHTML = '';
-  if (!names.length) {
-    el.innerHTML = '<span class="none">no saved variations yet — '
-      + 'shuffle, then <b>save this one</b></span>';
-    return;
-  }
-  for (const n of names) {
-    const d = document.createElement('span');
-    d.className = 'v';
-    d.innerHTML = '<b></b><i title="forget">x</i>';
-    d.querySelector('b').textContent = n;
-    d.querySelector('b').onclick = () => recall(n);
-    d.querySelector('i').onclick = () => drop(n);
-    el.append(d);
-  }
-}
-
-function fromHash() {
-  const h = decodeURIComponent(location.hash.replace(/^#/, ''));
-  if (!h) return false;
-  const by = {};
-  for (const k of KNOBS) if (k.kind !== 'group') by[k.dest] = k;
-  for (const pair of h.split('&')) {
-    const [a, b] = pair.split('=');
-    const k = by[a]; if (!k) continue;
-    V[a] = k.kind === 'bool' ? (b === '1' || b === 'true') : +b;
-    TOUCHED.add(a);
-  }
-  return true;
 }
 
 function reset() {
