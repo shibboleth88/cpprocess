@@ -250,41 +250,39 @@ function note() {
 }
 
 async function shuffle() {
-  // a different arrangement, actually loaded
-  if (SEEDS.length) {
-    let k = Math.floor(Math.random() * SEEDS.length);
-    if (SEEDS.length > 1 && k === seedAt) k = (k + 1) % SEEDS.length;
-    seedAt = k;
-    const seed = SEEDS[k];
-    const el = document.getElementById('stale');
-    el.className = 'on'; el.textContent = 'loading arrangement ' + seed + '…';
-    const t0 = performance.now();
-    try {
-      const sc = await (await fetch('seeds/' + seed + '.json')).json();
-      const w = W();
-      if (w && w.CP.setScene) {
-        w.CP.setScene(sc);
-        V.seed = seed; TOUCHED.add('seed');
-        el.className = 'on';
-        el.innerHTML = '<b>arrangement ' + seed + '</b> — loaded in ' +
-          ((performance.now() - t0) / 1000).toFixed(1) + 's, and playing. ' +
-          'This is a real build; the command below makes the same file.';
-      }
-    } catch (e) {
-      el.className = 'on'; el.textContent = 'could not load that arrangement: ' + e;
-    }
+  if (!SEEDS.length) { note(); return; }
+  let k = Math.floor(Math.random() * SEEDS.length);
+  if (SEEDS.length > 1 && k === seedAt) k = (k + 1) % SEEDS.length;
+  seedAt = k;
+  const name = SEEDS[k];
+  const el = document.getElementById('stale');
+  el.className = 'on'; el.textContent = 'loading ' + name + '...';
+  const t0 = performance.now();
+  try {
+    const pay = await (await fetch('seeds/' + name + '.json')).json();
+    const w = W();
+    if (!w || !w.CP.setScene) { el.textContent = 'the preview is not ready yet'; return; }
+    w.CP.setScene(pay.scene);
+    // THE SLIDERS FOLLOW THE ARRANGEMENT. Otherwise the page shows one piece
+    // and hands you the command for another, which is the one thing it must
+    // not do. It also makes every variation somewhere to carry on tuning
+    // from, rather than a dead end.
+    V = JSON.parse(JSON.stringify(START));
+    TOUCHED.clear();
+    for (const a2 in pay.vals) { V[a2] = pay.vals[a2]; TOUCHED.add(a2); }
+    draw();
+    for (const d in LIVE) apply(d);
+    document.getElementById('pp').textContent = 'pause';
+    el.className = 'on';
+    el.innerHTML = '<b>' + name + '</b> - a different build, loaded in ' +
+      ((performance.now() - t0) / 1000).toFixed(1) + 's and playing. presence ' +
+      pay.vals.presence + ' &middot; resolves at ' + pay.vals.resolve_at +
+      ' &middot; ' + pay.vals.tracers + ' tracers &middot; rings ' +
+      (pay.vals.ring_sweep ? 'swept' : 'grown') +
+      '. Every slider now matches it, and so does the command.';
+  } catch (e) {
+    el.className = 'on'; el.textContent = 'could not load ' + name + ': ' + e;
   }
-  // and the render-time knobs, which the preview can honour as they move
-  for (const k of KNOBS) {
-    if (k.kind === 'group' || !k.live || !k.shuf) continue;
-    const cur = +V[k.dest];
-    const span = (cur || (k.hi - k.lo) * 0.25) * SPREAD;
-    let v = Math.max(k.lo, Math.min(k.hi, cur + (Math.random() * 2 - 1) * span));
-    v = k.kind === 'int' ? Math.round(v) : Math.round(v / k.step) * k.step;
-    V[k.dest] = +v.toFixed(4); TOUCHED.add(k.dest);
-  }
-  draw();
-  for (const d in LIVE) apply(d);
 }
 
 function reset() {
